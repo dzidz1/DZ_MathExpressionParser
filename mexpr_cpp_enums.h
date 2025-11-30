@@ -60,7 +60,10 @@ typedef enum {
   MATH_CPP_DTYPE_MAX
 } mexprcpp_dtypes_t;
 
-typedef enum { PARSER_EOL = (int)MATH_CPP_DTYPE_MAX + 1 } mexprcpp_extra;
+typedef enum {
+  PARSER_EOL = (int)MATH_CPP_DTYPE_MAX + 1,
+  PARSER_WHITE_SPACE
+} mexprcpp_extra;
 
 static inline int math_cpp_operator_precedence(int token_code) {
   mexprcpp_operators_t opr_code = (mexprcpp_operators_t)token_code;

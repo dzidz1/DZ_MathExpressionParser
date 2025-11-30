@@ -3,11 +3,125 @@
 #include <stdio.h>
 #include <string.h>
 
-extern "C" int yylex();
-extern char lex_buffer[512];
+#define MAX_MEXPR_LEN 512
+#define MAX_STRING_SIZE 512
 
 
-char lex_buffer[512];
+typedef struct lex_data {
+    int token_code;
+    int token_len;
+    char *token_val;
+} lex_data_t;
+
+typedef struct stack {
+    int top;
+    lex_data_t data[MAX_MEXPR_LEN];
+} stack_t;
+
+extern "C" int yylex()
+static void lex_push(lex_data_t lex_data);
+static lex_data_t lex_pop();
+static void process_white_space(int n);
+static void lex_data_free(lex_data_t *lex_data);
+
+extern char lex_buffer[MAX_STRING_SIZE];
+extern stack_t undo_stack;
+extern char *curr_ptr;
+extern int cyylex();
+extern void yyrewind(int n);
+extern char *lex_curr_token;
+extern int lex_curr_token_len;
+
+stack_t undo_stack = {-1, {0, 0, 0}}; // top = -1 when stack is empty
+char lex_buffer[MAX_STRING_SIZE];
+char *curr_ptr = lex_buffer;
+char *lex_curr_token = NULL;
+int lex_curr_token_len = 0;
+
+
+static void lex_push(lex_data_t lex_data) {
+    assert(undo_stack.top < MAX_MEXPR_LEN - 1);
+    undo_stack.data[++undo_stack.top] = lex_data;
+    lex_curr_token = (char *)lex_data.token_val;
+    lex_curr_token_len = lex_data.token_len;
+}
+
+static lex_data_t lex_pop() {
+    assert(undo_stack.top > -1);
+    lex_data_t peek = undo_stack.data[undo_stack.top];
+    undo_stack.top--;
+
+    if(undo_stack.top > -1) {
+        lex_data_t *stack_top = &undo_stack.data[undo_stack.top];
+        lex_curr_token = stack_top->token_val;
+        lex_curr_token_len = stack_top->token_len;
+    } else {
+        lex_curr_token = NULL;
+        lex_curr_token_len = 0;
+    }
+
+    return peek;
+}
+
+static void lex_data_free(lex_data_t *lex_data) {
+    if(lex_data && lex_data->token_val) {
+        free(lex_data->token_val);
+        lex_data->token_val = NULL;
+    }
+}
+
+
+static void process_white_space(int n) {
+    lex_data_t lex_data;
+    lex_data.token_code = PARSER_WHITE_SPACE;
+    lex_data.token_len = n;
+    lex_data.token_val = NULL;
+    lex_push(lex_data);
+    curr_ptr += n;
+}
+
+
+int cyylex() {
+    int token_code = yylex();
+
+    lex_data_t lex_data;
+    lex_data.token_code = token_code;
+    lex_data.token_len = yyleng;
+    lex_data.token_val = (char *)malloc(yyleng + 1);
+    assert(lex_data.token_val != NULL);
+    memcpy(lex_data.token_val, yytext, yyleng);
+    lex_data.token_val[yyleng] = '\0';
+
+    lex_push(lex_data);
+    curr_ptr += yyleng;
+    
+    return token_code;
+}
+
+/* argument n represents the number of non-space tokens that should be removed */
+void yyrewind(int n) {
+    if(n <= 0 || curr_ptr == lex_buffer) return;
+    int data_len = 0;
+    lex_data_t lex_data;
+    while(n > 0) {
+        lex_data = lex_pop();
+        data_len += lex_data.token_len;
+        if(lex_data.token_code == PARSER_WHITE_SPACE) continue;
+        n--;
+        lex_data.token_code = 0;
+        lex_data.token_len = 0;
+    }
+    curr_ptr -= data_len;
+    yy_scan_string(curr_ptr);
+}
+
+void lex_cleanup() {
+    while(undo_stack.top >= 0) {
+        lex_data_t lex_data = lex_pop();
+        lex_data_free(&lex_data);
+    }
+}
+
 %}
 
 
@@ -21,7 +135,9 @@ IDENT    {LETTER}({LETTER}|{DIGIT})*
 
 %%
 
-[ \t]+          { /* Skip whitespace */ }
+[]              { process_white_space(1); }
+
+[ \t]+          { process_white_space(yyleng); }
 
 "\n"            { return PARSER_EOL; }
 
@@ -76,7 +192,8 @@ int main(int argc, char **argv) {
         if(lex_buffer[0] == '\n') {
             continue;
         }
-        
+
+        curr_ptr = lex_buffer;
         yy_scan_string(lex_buffer);
 
         int token_code;
@@ -84,6 +201,8 @@ int main(int argc, char **argv) {
             printf("token code = %d, token = %s, token_len = %d\n", 
                    token_code, yytext, yyleng);
         }
+        
+        lex_cleanup();
         printf("\n");
     }
 
