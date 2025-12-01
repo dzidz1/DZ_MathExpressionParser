@@ -1,45 +1,13 @@
 %{
 #include "mexpr_cpp_enums.h"
-#include <stdio.h>
-#include <string.h>
+#include "parser_export.h"
 
-#define MAX_MEXPR_LEN 512
-#define MAX_STRING_SIZE 512
-
-
-typedef struct lex_data {
-    int token_code;
-    int token_len;
-    char *token_val;
-} lex_data_t;
-
-typedef struct stack {
-    int top;
-    lex_data_t data[MAX_MEXPR_LEN];
-} stack_t;
-
-extern "C" int yylex()
-static void lex_push(lex_data_t lex_data);
-static lex_data_t lex_pop();
-static void process_white_space(int n);
-static void lex_data_free(lex_data_t *lex_data);
-
-extern char lex_buffer[MAX_STRING_SIZE];
-extern stack_t undo_stack;
-extern char *curr_ptr;
-extern int cyylex();
-extern void yyrewind(int n);
-extern char *lex_curr_token;
-extern int lex_curr_token_len;
-extern void parser_stack_reset();
-extern void lex_set_scan_buffer(const char *buffer);
 
 stack_t undo_stack = {-1, {0, 0, 0}}; // top = -1 when stack is empty
 char lex_buffer[MAX_STRING_SIZE];
 char *curr_ptr = lex_buffer;
 char *lex_curr_token = NULL;
 int lex_curr_token_len = 0;
-
 
 static void lex_push(lex_data_t lex_data) {
     assert(undo_stack.top < MAX_MEXPR_LEN - 1);
@@ -131,6 +99,20 @@ void yyrewind(int n) {
     yy_scan_string(curr_ptr);
 }
 
+void RESTORE_CHECKPOINT(int check) {
+    while(undo_stack.top > check) {
+        lex_data_t lex_data = lex_pop();
+        curr_ptr -= lex_data.token_len;
+
+        if(lex_data.token_val) {
+            free(lex_data.token_val);
+            lex_data.token_val = NULL;
+        }
+    }
+
+    yy_scan_string(curr_ptr);
+}
+
 %}
 
 
@@ -144,7 +126,7 @@ IDENT    {LETTER}({LETTER}|{DIGIT})*
 
 %%
 
-[]              { process_white_space(1); }
+[ ]              { process_white_space(1); }
 
 [ \t]+          { process_white_space(yyleng); }
 
@@ -211,7 +193,7 @@ int main(int argc, char **argv) {
                    token_code, yytext, yyleng);
         }
         
-        lex_cleanup();
+        
         printf("\n");
     }
 
