@@ -1,0 +1,4 @@
+.vscode/
+lex.yy.c
+*.o
+exe
