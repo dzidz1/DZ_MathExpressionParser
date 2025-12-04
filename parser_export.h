@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+typedef enum parse_rc { PARSE_ERR, PARSE_SUCCESS } parse_rc_t;
+
 #define MAX_MEXPR_LEN 512
 #define MAX_STRING_SIZE 512
 
@@ -33,5 +35,23 @@ extern void lex_set_scan_buffer(const char *buffer);
 extern void RESTORE_CHECKPOINT(int check);
 
 #define CHECKPOINT(check) check = undo_stack.top
+
+#define RETURN_PARSE_ERROR                                                     \
+  {                                                                            \
+    RESTORE_CHECKPOINT(_lchkp);                                                \
+    return PARSE_ERR;                                                          \
+  }
+
+#define RETURN_PARSE_SUCCESS return PARSE_SUCCESS
+
+#define parse_init()                                                           \
+  int token_code = 0;                                                          \
+  int _lchkp = undo_stack.top;                                                 \
+  parse_rc_t err = PARSE_SUCCESS
+
+#define PARSER_LOG_ERR(token_obtained, expected_token)                         \
+  printf("%s(%d) : Token Obtained = %d (%s) , expected token = %d\n",          \
+         __FUNCTION__, __LINE__, token_obtained, lex_curr_token,               \
+         expected_token)
 
 #endif

@@ -2,7 +2,6 @@
 #define __MEXPRCPPENUMS__
 
 #include <assert.h>
-#include <stdbool.h>
 
 #define MEXPR_OPR 1
 #define MEXPR_OPND -1

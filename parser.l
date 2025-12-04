@@ -3,6 +3,8 @@
 #include "parser_export.h"
 
 
+extern void parse_equations();
+extern parse_rc_t A();
 stack_t undo_stack = {-1, {0, 0, 0}}; // top = -1 when stack is empty
 char lex_buffer[MAX_STRING_SIZE];
 char *curr_ptr = lex_buffer;
@@ -141,7 +143,7 @@ IDENT    {LETTER}({LETTER}|{DIGIT})*
 "!="            { return MATH_CPP_NEQ; }
 "<"             { return MATH_CPP_LESS_THAN; }
 ">"             { return MATH_CPP_GREATER_THAN; }
-"=="            { return MATH_CPP_EQ; }
+"="             { return MATH_CPP_EQ; }
 
 "and"           { return MATH_CPP_AND; }
 "or"            { return MATH_CPP_OR; }
@@ -175,7 +177,7 @@ int yywrap() {
 int main(int argc, char **argv) {
     while(1) {
         printf("Input->   ");
-        
+    
         if(fgets(lex_buffer, sizeof(lex_buffer), stdin) == NULL) {
             break;
         }
@@ -184,16 +186,17 @@ int main(int argc, char **argv) {
             continue;
         }
 
-        curr_ptr = lex_buffer;
-        yy_scan_string(lex_buffer);
+        lex_set_scan_buffer(lex_buffer);
 
-        int token_code;
-        while((token_code = yylex()) != PARSER_EOL) {
-            printf("token code = %d, token = %s, token_len = %d\n", 
-                   token_code, yytext, yyleng);
+        
+        parse_rc_t err = A();
+        if(err == PARSE_ERR) {
+            printf("rejected\n");
+        } else {
+            printf("accepted\n");
         }
-        
-        
+
+        parser_stack_reset();
         printf("\n");
     }
 
