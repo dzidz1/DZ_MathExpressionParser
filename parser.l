@@ -5,6 +5,7 @@
 
 extern void parse_equations();
 extern parse_rc_t A();
+extern parse_rc_t C();
 stack_t undo_stack = {-1, {0, 0, 0}}; // top = -1 when stack is empty
 char lex_buffer[MAX_STRING_SIZE];
 char *curr_ptr = lex_buffer;
@@ -189,11 +190,18 @@ int main(int argc, char **argv) {
         lex_set_scan_buffer(lex_buffer);
 
         
-        parse_rc_t err = A();
+        //parse_rc_t err = A();
+        parse_rc_t err = C();
         if(err == PARSE_ERR) {
             printf("rejected\n");
         } else {
             printf("accepted\n");
+        }
+
+        printf("parsed string: \n");
+        for(int i = 0; i < undo_stack.top; i++) {
+            lex_data_t *lex_data = (lex_data_t *)&undo_stack.data[i];
+            printf("%s", lex_data->token_val);
         }
 
         parser_stack_reset();
